@@ -96,86 +96,40 @@ function App() {
     }
   }
   const extractDocxFile = (arrayBuffer) => {
-    var options = {
-      styleMap: [
-        "i => em",
-        "u => u",
-        "strong => em"
-      ]
-    }
-    mammoth.convertToHtml({arrayBuffer: arrayBuffer}, options)
-    .then(function(result){
-    var html = result.value; // The generated HTML
-    if (html.includes('<u>')){
-      document.getElementById("text").classList.add("underline")
-      document.getElementById("received-text").classList.add("underline")
-    }
-    if (html.includes('em')){
-      document.getElementById("text").classList.add("italic")
-      document.getElementById("text").classList.add("font-bold")
-      document.getElementById("received-text").classList.add("italic")
-      document.getElementById("received-text").classList.add("font-bold")
-    }
-    })
-    .catch(function(error) {
-    console.error(error);
-    })
-    mammoth.extractRawText({arrayBuffer: arrayBuffer}, options)
-    .then(function(result){
-    setText(result.value)
-    })
-    .catch(function(error) {
-    console.error(error);
-    })
+    mammoth.extractRawText({arrayBuffer: arrayBuffer}).then(function(result){
+      setText(result.value)
+  }).catch(function(err){
+      console.log(err);
+  });
   }
-  const extractDocxFile1 = (arrayBuffer) => {
-    var options = {
-      styleMap: [
-        "i => em",
-        "u => u",
-        "strong => em"
-      ]
-    }
-    mammoth.convertToHtml({arrayBuffer: arrayBuffer}, options)
-    .then(function(result){
-    var html = result.value; // The generated HTML
-    if (html.includes('<u>')){
-      //document.getElementById("text").classList.add("underline")
-      document.getElementById("received-text").classList.add("underline")
-    }
-    if (html.includes('em')){
-      //document.getElementById("text").classList.add("italic")
-      //document.getElementById("text").classList.add("font-bold")
-      document.getElementById("received-text").classList.add("italic")
-      document.getElementById("received-text").classList.add("font-bold")
-    }
+  const extractDocxFile_ = (file) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    fetch('http://localhost:8080/api/v1/get-html', {
+        method: 'POST',
+        body: formData
     })
-    .catch(function(error) {
-    console.error(error);
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Network response was not ok');
+        }
+        return response.text();
     })
-    mammoth.extractRawText({arrayBuffer: arrayBuffer}, options)
-    .then(function(result){
-    setReceivedText(result.value)
+    .then(data => {
+      if (document.getElementById("text-container").children.length != 1){
+        document.getElementById("text-container").removeChild(document.getElementById("text-container").children[1])
+        document.getElementById("text").classList.remove("hidden")
+        document.getElementById("text-container").classList.remove("p-[15px]")
+      }
+      const para = document.createElement("div");
+      para.innerHTML = data
+      document.getElementById('text-container').append(para)
+      document.getElementById('text-container').classList.add("p-[15px]")
+      document.getElementById('text').classList.add("hidden")
     })
-    .catch(function(error) {
-    console.error(error);
-    })
-  }
-  const extractDocxFile2 = (arrayBuffer) => {
-    var options = {
-      styleMap: [
-        "i => em",
-        "u => u",
-        "strong => em"
-      ]
-    }
-    mammoth.extractRawText({arrayBuffer: arrayBuffer}, options)
-    .then(function(result){
-    setReceivedSignature(result.value)
-    })
-    .catch(function(error) {
-    console.error(error);
-    })
+    .catch(error => {
+        console.error('Error uploading file:', error);
+    });
   }
   const expand = () => {
     const classList = document.getElementById('key-gen-dropdown').classList
@@ -190,9 +144,24 @@ function App() {
       }, 400)
     }
   }
+  const reset = () => {
+    setText("")
+    setReceivedText("")
+    setEncryptText("")
+    setDecryptedText("")
+    setFileName("Chọn tệp")
+    if (document.getElementById("text-container").children.length != 1){
+      document.getElementById("text-container").removeChild(document.getElementById("text-container").children[1])
+      document.getElementById("text").classList.remove("hidden")
+      document.getElementById("text-container").classList.remove("p-[15px]")
+    }
+  }
   useEffect(()=>{
     document.getElementById("file-picker").addEventListener('change', (event)=>{
       event.preventDefault()
+      setDecryptedText("")
+      setEncryptText("")
+      setReceivedText("")
       const fr = new FileReader()
       const files = document.getElementById("file-picker").files
       const extension = files[0].name.split(".")[files[0].name.split(".").length - 1]
@@ -201,18 +170,18 @@ function App() {
           setText(fr.result)
         }
         fr.readAsText(files[0])
-        document.getElementById("text").classList.remove("underline")
-        document.getElementById("received-text").classList.remove("underline")
-        document.getElementById("text").classList.remove("italic")
-        document.getElementById("received-text").classList.remove("font-bold")
-        document.getElementById("text").classList.remove("font-bold")
-        document.getElementById("received-text").classList.remove("italic")
+        if (document.getElementById("text-container").children.length != 1){
+          document.getElementById("text-container").removeChild(document.getElementById("text-container").children[1])
+          document.getElementById("text").classList.remove("hidden")
+          document.getElementById("text-container").classList.remove("p-[15px]")
+        }
       }
       setFileName(files[0].name)
       
       //console.log(fr.readAsArrayBuffer(files[0]))
       if (extension === 'docx'){
-        fr.onload = () =>{
+        extractDocxFile_(files[0])
+        fr.onload = () => {
           extractDocxFile(fr.result)
         }
         fr.readAsArrayBuffer(files[0])
@@ -228,6 +197,7 @@ function App() {
     // })
     document.getElementById("file-picker-receive").addEventListener('change', (event)=>{
       event.preventDefault()
+      setDecryptedText("")
       const fr = new FileReader()
       const files = document.getElementById("file-picker-receive").files
       const extension = files[0].name.split(".")[files[0].name.split(".").length - 1]
@@ -236,22 +206,10 @@ function App() {
           setReceivedText(fr.result)
         }
         fr.readAsText(files[0])
-        document.getElementById("text").classList.remove("underline")
-        document.getElementById("received-text").classList.remove("underline")
-        document.getElementById("text").classList.remove("italic")
-        document.getElementById("received-text").classList.remove("font-bold")
-        document.getElementById("text").classList.remove("font-bold")
-        document.getElementById("received-text").classList.remove("italic")
       }
       setFileName1(files[0].name)
       
       //console.log(fr.readAsArrayBuffer(files[0]))
-      if (extension === 'docx'){
-        fr.onload = () =>{
-          extractDocxFile1(fr.result)
-        }
-        fr.readAsArrayBuffer(files[0])
-      }
     })
   }, [])
   return (
@@ -289,7 +247,7 @@ function App() {
           <div className="flex flex-col flex-1 gap-[10%]">
             <p className="font-[500] text-[15px]">Bản rõ</p>
             <div className="flex flex-1 flex-col gap-[10%]">
-              <div className="flex mb-10">
+              <div className="flex mb-10 bg-slate-100 rounded-[10px] h-[200px]" id="text-container">
                 <textarea name="" id="text" onChange={(event)=>{setText(event.target.value)}} className="flex bg-slate-100 resize-none rounded-[10px] flex-1 h-[200px] outline-none p-[15px] border-[#171717]" value={text}></textarea>
               </div>
               <div className="flex flex-row justify-between">
@@ -298,7 +256,10 @@ function App() {
                   <p className="text-14px">{fileName}</p>
                 </div>
                 <input type="file" className="text-[14px] hidden" id="file-picker" accept=".txt, .docx"/>
+                <div className="flex gap-[10px]">
                 <button className="text-[14px] bg-[#3a3835] text-white px-[15px] py-[4px] rounded-full" onClick={()=>{encode()}}>Mã hóa</button>
+                <button className="text-[14px] bg-[#3a3835] text-white px-[15px] py-[4px] rounded-full" onClick={()=>{reset()}}>Nhập lại</button>
+                </div>
               </div>
             </div>
           </div>
